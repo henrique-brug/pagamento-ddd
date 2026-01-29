@@ -4,11 +4,20 @@ import { AssinaturaRepository } from '../../../../domain/assinatura/repository/a
 import PeriodoVigencia from '../../../../domain/assinatura/value-object/periodo-vigencia';
 import { StatusAssinatura } from '../../../../domain/assinatura/value-object/status-assinatura';
 import { PrismaService } from '../prisma.service';
+import { OutboxRepository } from '../../../outbox/outbox.repository';
 
 @Injectable()
 export class PrismaAssinaturaRepository implements AssinaturaRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly outboxRepository: OutboxRepository,
+  ) {}
 
+  /**
+   * Salva a assinatura usando o padrão Outbox
+   * Garante que o evento AssinaturaCriada seja salvo atomicamente
+   * na mesma transação da assinatura
+   */
   async salvar(assinatura: Assinatura): Promise<void> {
     const dados = {
       id: assinatura.assinaturaId,
@@ -23,10 +32,34 @@ export class PrismaAssinaturaRepository implements AssinaturaRepository {
     console.log('Dados que serão salvos:', JSON.stringify(dados, null, 2));
 
     try {
-      await this.prisma.assinatura.create({
-        data: dados,
+      // Usa transação para garantir atomicidade entre assinatura e evento
+      await this.prisma.$transaction(async (prismaClient) => {
+        // 1. Salva a assinatura
+        await prismaClient.assinatura.create({
+          data: dados,
+        });
+
+        // 2. Salva o evento no outbox (mesma transação)
+        await this.outboxRepository.addEvent(
+          {
+            aggregateId: assinatura.assinaturaId,
+            aggregateType: 'Assinatura',
+            eventType: 'AssinaturaCriada',
+            payload: {
+              assinaturaId: assinatura.assinaturaId,
+              usuarioId: assinatura.usuarioId,
+              planoId: assinatura.planoId,
+              status: assinatura.status,
+              tipoVigencia: assinatura.periodoVigencia.tipo,
+              inicioVigencia: assinatura.periodoVigencia.inicio,
+              proximaCobranca: assinatura.periodoVigencia.proximaCobranca,
+            },
+          },
+          prismaClient,
+        );
       });
-      console.log('Assinatura salva com sucesso!');
+
+      console.log('Assinatura e evento salvos com sucesso (Outbox Pattern)!');
     } catch (error) {
       console.error('Erro completo ao salvar assinatura:', error);
       throw error;
