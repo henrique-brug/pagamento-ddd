@@ -1,11 +1,13 @@
 +------------------------+         +------------------------+
-|  BC: IDENTIDADE        |         |   BC: CATÁLOGO/PLANOS   |
+|  BC: IDENTIDADE        |         |   BC: PLANOS           |
 |------------------------|         |------------------------|
 | Aggregate: Usuario     |         | Aggregate: Plano       |
 |  - usuarioId           |         |  - planoId             |
-|  - email               |         |  - nome                |
-|  - status              |         |  - preco               |
-+-----------+------------+         |  - periodicidade       |
++-----------+------------+         |  - nome                |
+            |                      |  - descricao           |
+            |                      |  - preco               |
+            |                      |  - periodicidade       |
+            |                      |  - beneficios[]        |
             |                      +-----------+------------+
             |                                  |
             |                                  |
@@ -18,13 +20,13 @@
 |  - usuarioId (ref)                                        |
 |  - planoId   (ref)                                        |
 |  - status: {PENDENTE, ATIVA, PAUSADA, CANCELADA}          |
-|  - inicioEm, proximaCobrancaEm                            |
-|  - canceladaEm?                                           |
+|  - inicio,                                                |
+|  - proximaCobranca                                        |
+|  - cancelada?                                             |
 |-----------------------------------------------------------|
 | Entidades/VO dentro do aggregate:                         |
 |  - PeriodoVigencia (VO)                                   |
 |  - RegrasDeRenovacao (VO)                                 |
-|  - HistoricoStatus* (opcional)                            |
 +---------------------------+-------------------------------+
                             |
                             | (gera cobranças / solicita pagamento)
