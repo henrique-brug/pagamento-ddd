@@ -1,0 +1,78 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Assinatura {
+  id               String   @id @default(uuid())
+  usuarioId        String   @map("usuario_id")
+  planoId          String   @map("plano_id")
+  status           String
+  tipoVigencia     String   @map("tipo_vigencia")
+  inicioVigencia   DateTime @map("inicio_vigencia")
+  proximaCobranca  DateTime @map("proxima_cobranca")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("assinaturas")
+}
+
+// Tabela Outbox para garantir entrega confiável de eventos
+model OutboxEvent {
+  id            String   @id @default(uuid())
+  aggregateId   String   @map("aggregate_id") // ID da entidade que gerou o evento
+  aggregateType String   @map("aggregate_type") // Tipo do agregado (ex: Assinatura)
+  eventType     String   @map("event_type") // Tipo do evento (ex: AssinaturaCriada)
+  payload       String   // JSON com os dados do evento
+  status        String   @default("PENDING") // PENDING, PROCESSED, FAILED
+  createdAt     DateTime @default(now()) @map("created_at")
+  processedAt   DateTime? @map("processed_at")
+  attempts      Int      @default(0) // Número de tentativas de processamento
+  error         String?  // Mensagem de erro, se houver
+
+  @@index([status, createdAt])
+  @@map("outbox_events")
+}
+
+// Tabela Saga para orquestrar transações distribuídas
+model SagaInstance {
+  id            String   @id @default(uuid())
+  sagaType      String   @map("saga_type") // Tipo da saga (ex: CriacaoAssinaturaSaga)
+  status        String   @default("STARTED") // STARTED, COMPLETED, FAILED, COMPENSATING, COMPENSATED
+  currentStep   Int      @default(0) @map("current_step") // Passo atual da saga
+  payload       String   // JSON com dados da saga
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  completedAt   DateTime? @map("completed_at")
+  error         String?  // Mensagem de erro, se houver
+
+  steps         SagaStep[]
+
+  @@index([status, createdAt])
+  @@map("saga_instances")
+}
+
+// Tabela para armazenar cada passo da saga
+model SagaStep {
+  id            String   @id @default(uuid())
+  sagaId        String   @map("saga_id")
+  stepName      String   @map("step_name")
+  stepOrder     Int      @map("step_order")
+  status        String   @default("PENDING") // PENDING, COMPLETED, FAILED, COMPENSATED
+  input         String?  // JSON com input do passo
+  output        String?  // JSON com output do passo
+  error         String?  // Mensagem de erro, se houver
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  saga          SagaInstance @relation(fields: [sagaId], references: [id], onDelete: Cascade)
+
+  @@index([sagaId, stepOrder])
+  @@map("saga_steps")
+}
