@@ -10,26 +10,27 @@ export class PrismaAssinaturaRepository implements AssinaturaRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async salvar(assinatura: Assinatura): Promise<void> {
-    await this.prisma.assinatura.upsert({
-      where: { id: assinatura.assinaturaId },
-      create: {
-        id: assinatura.assinaturaId,
-        usuarioId: assinatura.usuarioId,
-        planoId: assinatura.planoId,
-        status: assinatura.status,
-        tipoVigencia: assinatura.periodoVigencia.tipo,
-        inicioVigencia: assinatura.periodoVigencia.inicio,
-        proximaCobranca: assinatura.periodoVigencia.proximaCobranca,
-      },
-      update: {
-        usuarioId: assinatura.usuarioId,
-        planoId: assinatura.planoId,
-        status: assinatura.status,
-        tipoVigencia: assinatura.periodoVigencia.tipo,
-        inicioVigencia: assinatura.periodoVigencia.inicio,
-        proximaCobranca: assinatura.periodoVigencia.proximaCobranca,
-      },
-    });
+    const dados = {
+      id: assinatura.assinaturaId,
+      usuarioId: assinatura.usuarioId,
+      planoId: assinatura.planoId,
+      status: String(assinatura.status),
+      tipoVigencia: assinatura.periodoVigencia.tipo,
+      inicioVigencia: new Date(assinatura.periodoVigencia.inicio),
+      proximaCobranca: new Date(assinatura.periodoVigencia.proximaCobranca),
+    };
+
+    console.log('Dados que serão salvos:', JSON.stringify(dados, null, 2));
+
+    try {
+      await this.prisma.assinatura.create({
+        data: dados,
+      });
+      console.log('Assinatura salva com sucesso!');
+    } catch (error) {
+      console.error('Erro completo ao salvar assinatura:', error);
+      throw error;
+    }
   }
 
   async buscarPorId(id: string): Promise<Assinatura | null> {
